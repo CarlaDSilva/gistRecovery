@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rescate Gist · Clarito</title>
+<style>
+  :root{--bg0:#0d0d0f;--bg1:#141417;--bg2:#1c1c21;--bg3:#242429;--brd:#2e2e35;--txt0:#f2f2f5;--txt1:#a0a0aa;--accent:#7c6ef5;--green:#3ecf8e;--red:#f2555a;--rad:14px;--rad-sm:10px}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg0);color:var(--txt0);font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',system-ui,sans-serif;padding:20px;max-width:680px;margin:0 auto;font-size:16px}
+  h1{font-size:22px;margin:8px 0 4px}
+  .sub{color:var(--txt1);font-size:14px;margin:0 0 20px}
+  label{display:block;font-size:14px;color:var(--txt1);margin:14px 0 6px}
+  input{width:100%;background:var(--bg3);color:var(--txt0);border:1px solid var(--brd);border-radius:var(--rad-sm);padding:13px 14px;font-size:16px;outline:none;font-family:inherit}
+  input:focus{border-color:var(--accent)}
+  button{border:none;border-radius:var(--rad-sm);font-family:inherit;font-size:16px;font-weight:600;cursor:pointer}
+  .btn-primary{background:var(--accent);color:#fff;padding:15px;width:100%;margin-top:18px}
+  .btn-primary:disabled{opacity:.5}
+  .card{background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad);padding:14px;margin:10px 0}
+  .rev{display:flex;align-items:center;gap:12px;padding:14px;background:var(--bg2);border:1px solid var(--brd);border-radius:var(--rad);margin:8px 0}
+  .rev-info{flex:1;min-width:0}
+  .rev-date{font-size:16px;font-weight:600}
+  .rev-sha{font-size:12px;color:var(--txt1);font-family:ui-monospace,monospace;margin-top:2px}
+  .rev-btn{background:var(--bg3);color:var(--txt0);padding:11px 14px;border:1px solid var(--brd);white-space:nowrap}
+  .status{margin:16px 0;padding:13px;border-radius:var(--rad-sm);font-size:14px;line-height:1.5}
+  .status.err{background:rgba(242,85,90,.12);border:1px solid var(--red);color:#ffb3b6}
+  .status.ok{background:rgba(62,207,142,.12);border:1px solid var(--green);color:#9ff0c8}
+  .status.info{background:var(--bg2);border:1px solid var(--brd);color:var(--txt1)}
+  .out-actions{display:flex;gap:10px;margin-top:12px}
+  .out-actions button{flex:1;padding:14px}
+  .btn-dl{background:var(--green);color:#04150c}
+  .btn-copy{background:var(--bg3);color:var(--txt0);border:1px solid var(--brd)}
+  .meta{font-size:13px;color:var(--txt1);margin-top:8px}
+  a{color:var(--accent)}
+  .hint{font-size:13px;color:var(--txt1);margin-top:6px;line-height:1.5}
+</style>
+</head>
+<body>
+  <h1>Rescate de Gist</h1>
+  <p class="sub">Solo lectura. Lista las revisiones antiguas por la API (sin el web lento) y descarga la que elijas.</p>
+
+  <label>Gist ID</label>
+  <input id="gistId" placeholder="ej: a1b2c3d4e5f6..." autocomplete="off" autocapitalize="off" spellcheck="false">
+  <p class="hint">Está en Clarito → Configuración, o en la URL de tu gist tras tu usuario.</p>
+
+  <label>Token de GitHub <span style="color:var(--txt1)">(solo si el gist es secreto)</span></label>
+  <input id="token" type="password" placeholder="ghp_... (opcional)" autocomplete="off">
+  <p class="hint">Es el mismo <b>gistToken</b> que usas en Clarito. Si el gist es público, déjalo vacío.</p>
+
+  <label>Nombre del archivo</label>
+  <input id="fileName" value="clarito-data.json" autocomplete="off" spellcheck="false">
+
+  <button class="btn-primary" id="loadBtn" onclick="loadRevisions()">Listar revisiones</button>
+
+  <div id="status"></div>
+  <div id="list"></div>
+  <div id="output"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function setStatus(msg,type){$('status').innerHTML=msg?`<div class="status ${type||'info'}">${msg}</div>`:'';}
+function hdrs(){const t=$('token').value.trim();const h={'Accept':'application/vnd.github+json'};if(t)h['Authorization']='token '+t;return h;}
+
+async function loadRevisions(){
+  const id=$('gistId').value.trim();
+  if(!id){setStatus('Escribe el Gist ID.','err');return;}
+  $('list').innerHTML='';$('output').innerHTML='';
+  $('loadBtn').disabled=true;
+  setStatus('Cargando revisiones por la API...','info');
+  try{
+    let all=[];
+    for(let page=1;page<=4;page++){
+      const res=await fetch(`https://api.github.com/gists/${id}/commits?per_page=100&page=${page}`,{headers:hdrs()});
+      if(res.status===404){setStatus('No encontrado (404). Si el gist es secreto, pega tu token. Si es público, revisa el ID.','err');$('loadBtn').disabled=false;return;}
+      if(res.status===403){setStatus('Límite de la API alcanzado (403). Pega un token para subir el límite, o espera unos minutos.','err');$('loadBtn').disabled=false;return;}
+      if(!res.ok){setStatus('Error '+res.status+' al listar revisiones.','err');$('loadBtn').disabled=false;return;}
+      const batch=await res.json();
+      all=all.concat(batch);
+      if(batch.length<100)break;
+    }
+    if(!all.length){setStatus('No hay revisiones visibles.','err');$('loadBtn').disabled=false;return;}
+    setStatus(`${all.length} revisiones encontradas. Elige una anterior a la pérdida por su fecha.`,'ok');
+    $('list').innerHTML=all.map(c=>{
+      const d=new Date(c.committed_at);
+      const fecha=d.toLocaleString('es-ES',{year:'numeric',month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'});
+      const sha=(c.version||'').slice(0,10);
+      return `<div class="rev"><div class="rev-info"><div class="rev-date">${fecha}</div><div class="rev-sha">${sha}</div></div><button class="rev-btn" onclick="fetchRevision('${c.version}')">Ver</button></div>`;
+    }).join('');
+  }catch(e){setStatus('Fallo de red: '+e.message,'err');}
+  $('loadBtn').disabled=false;
+}
+
+async function fetchRevision(sha){
+  const id=$('gistId').value.trim();
+  const fname=$('fileName').value.trim()||'clarito-data.json';
+  $('output').innerHTML='';
+  setStatus('Descargando la revisión '+sha.slice(0,10)+'...','info');
+  try{
+    const res=await fetch(`https://api.github.com/gists/${id}/${sha}`,{headers:hdrs()});
+    if(!res.ok){setStatus('Error '+res.status+' al abrir la revisión.','err');return;}
+    const g=await res.json();
+    const f=g.files&&g.files[fname];
+    if(!f){
+      const names=g.files?Object.keys(g.files).join(', '):'ninguno';
+      setStatus('No hay "'+fname+'" en esa revisión. Archivos: '+names,'err');return;
+    }
+    let content=f.content;
+    if(f.truncated||content==null){
+      setStatus('El archivo viene truncado por tamaño. Ábrelo directo aquí y guárdalo: <a href="'+f.raw_url+'" target="_blank">abrir contenido crudo</a>','err');return;
+    }
+    let count='';
+    try{const j=JSON.parse(content);if(Array.isArray(j.tickets))count=` · ${j.tickets.length} tickets, ${(j.expenses||[]).length} gastos`;}catch(_){}
+    const kb=Math.round(content.length/1024);
+    window._recovered=content;
+    setStatus('Revisión cargada. Revisa el tamaño y descarga.','ok');
+    $('output').innerHTML=`<div class="card"><div class="rev-date">${fname}</div><div class="meta">${kb} KB${count}</div>
+      <div class="out-actions">
+        <button class="btn-dl" onclick="downloadJSON('${fname}')">Descargar</button>
+        <button class="btn-copy" onclick="copyJSON()">Copiar</button>
+      </div>
+      <p class="hint">Descárgalo y, en Clarito, usa "Tengo un archivo JSON" al configurar, o pégamelo y lo fusiono con tus datos actuales sin duplicar.</p></div>`;
+  }catch(e){setStatus('Fallo de red: '+e.message,'err');}
+}
+
+function downloadJSON(fname){
+  const blob=new Blob([window._recovered||''],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fname;a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+async function copyJSON(){
+  try{await navigator.clipboard.writeText(window._recovered||'');setStatus('Copiado al portapapeles.','ok');}
+  catch(_){setStatus('No se pudo copiar; usa Descargar.','err');}
+}
+</script>
+</body>
+</html>
