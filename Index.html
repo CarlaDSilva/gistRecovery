@@ -113,10 +113,6 @@
       <span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 4 5-4"/><path d="M5 21h14"/></svg></span>
       <span><span class="bTitle">Descargar SIN claves</span><span class="bDesc">Guarda el .json limpio en el iPad.</span></span>
     </button>
-    <button class="btn-danger" id="copyKeys">
-      <span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2"/><circle cx="8" cy="15" r="5"/><path d="M11.5 11.5L20 3"/><path d="M17 6l2 2"/></svg></span>
-      <span><span class="bTitle">Copiar solo tus tokens (con ♥)</span><span class="bDesc">Cada token entre corazones. NUNCA lo pegues en un chat.</span></span>
-    </button>
     <button class="btn-danger" id="downFull">
       <span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 4 5-4"/><path d="M5 21h14"/><path d="M18 4l2 2"/></svg></span>
       <span><span class="bTitle">Descargar COMPLETO</span><span class="bDesc">Con claves. Solo para tu copia privada.</span></span>
@@ -153,8 +149,8 @@
   </p>
   <p>
     El botón verde <b>Copiar SIN claves</b> borra antes tus tokens y contraseñas, así que
-    es lo único que deberías pegar en un chat. El botón rojo con corazones es solo para ti:
-    cada token va envuelto en <b>♥ diez veces a cada lado</b> para que lo localices de un vistazo.
+    es lo único que deberías pegar en un chat. La descarga <b>completa</b> conserva las claves
+    y es solo para tu copia privada.
   </p>
 </details>
 
@@ -164,21 +160,6 @@
 // Claves que NUNCA salen en el modo "sin claves".
 const SENSITIVE = ["apiKey","ocrKey","visionKey","groqKey","gistToken",
   "cloudinarySecret","cloudinaryApiKey","cloudinaryWorkerToken","devMode"];
-
-// Etiqueta legible: qué es cada token y dónde se pega en Clarito.
-const LABELS = {
-  gistToken:            "Token de GitHub  →  campo \"Token del Gist\"",
-  groqKey:              "Clave de Groq  →  campo \"Groq\" (chat IA)",
-  visionKey:            "Clave de Google Vision  →  campo \"Vision\" (OCR)",
-  cloudinaryApiKey:     "API key de Cloudinary  →  ajustes de Cloudinary",
-  cloudinarySecret:     "Secret de Cloudinary  →  ajustes de Cloudinary",
-  cloudinaryWorkerToken:"Token del Worker  →  campo \"Token del Worker\"",
-  apiKey:               "apiKey (genérica)",
-  ocrKey:               "ocrKey (OCR básico)",
-  devMode:              "devMode (interno, no es un token)"
-};
-
-const HEARTS = "\u2665\uFE0F".repeat(10); // ♥️ x10
 
 let currentRaw = null; // texto JSON de la revisión elegida
 
@@ -207,22 +188,6 @@ function stripKeys(obj){
 function cleanJSON(){
   const data = JSON.parse(currentRaw);
   return JSON.stringify(stripKeys(data), null, 2);
-}
-
-// Lista de tokens encontrados, cada valor entre corazones, con su destino.
-function keysWithHearts(){
-  const data = JSON.parse(currentRaw);
-  const lines = [];
-  for(const k of SENSITIVE){
-    if(!(k in data)) continue;
-    const v = data[k];
-    if(v === "" || v === null || v === undefined) continue;
-    if(k === "devMode") continue; // no es un token
-    const label = LABELS[k] || k;
-    lines.push(label + "\n[" + HEARTS + " " + v + " " + HEARTS + "]");
-  }
-  if(!lines.length) return "Esta revisión no contiene tokens guardados.";
-  return "TUS TOKENS — no pegues esto en ningún chat\n\n" + lines.join("\n\n");
 }
 
 async function copy(text){
@@ -257,10 +222,6 @@ $("#copyClean").onclick = async () => {
 $("#downClean").onclick = () => {
   download(cleanJSON(), "clarito-data-SIN-claves.json");
   flash("Descargado sin claves.");
-};
-$("#copyKeys").onclick = async () => {
-  const ok = await copy(keysWithHearts());
-  flash(ok ? "Tokens copiados. Solo para ti." : "No se pudo copiar.", true);
 };
 $("#downFull").onclick = () => {
   download(currentRaw, "clarito-data-COMPLETO.json");
