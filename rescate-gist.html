@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Rescate Gist · Clarito</title>
+<style>
+  :root{
+    --bg:#14100f;         /* casi negro cálido */
+    --panel:#1f1917;      /* panel */
+    --panel2:#2a2220;     /* panel elevado */
+    --line:#3a2f2c;       /* bordes */
+    --ink:#f4ece9;        /* texto principal */
+    --muted:#b39f99;      /* texto secundario */
+    --amapola:#e4443b;    /* rojo amapola: acento y peligro */
+    --amapola-soft:#3a1a17;
+    --ok:#4caf7d;         /* verde seguro */
+    --ok-soft:#16281f;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg);color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+    font-size:19px;line-height:1.5;
+    padding:max(20px,env(safe-area-inset-top)) 18px calc(40px + env(safe-area-inset-bottom));
+    max-width:760px;margin:0 auto;
+  }
+  h1{font-size:1.5rem;margin:0 0 2px;letter-spacing:-.02em}
+  .ver{color:var(--muted);font-size:.85rem;margin:0 0 22px}
+
+  /* ----- ZONA DE RESULTADO (siempre arriba) ----- */
+  #resultZone{display:none;margin:0 0 26px}
+  #resultZone.on{display:block}
+  .rHead{display:flex;align-items:center;gap:10px;margin:0 0 12px}
+  .rHead .dot{width:11px;height:11px;border-radius:50%;background:var(--ok);flex:none}
+  .rHead h2{font-size:1.15rem;margin:0}
+  .rSub{color:var(--muted);font-size:.9rem;margin:-6px 0 16px}
+
+  .btnRow{display:flex;flex-direction:column;gap:12px;margin:0 0 14px}
+  button{
+    font:inherit;color:var(--ink);border:1px solid var(--line);
+    background:var(--panel2);border-radius:16px;padding:18px 20px;
+    display:flex;align-items:center;gap:14px;cursor:pointer;
+    text-align:left;width:100%;transition:transform .06s,border-color .15s,background .15s;
+  }
+  button:active{transform:scale(.98)}
+  button:focus-visible{outline:3px solid var(--amapola);outline-offset:2px}
+  button svg{flex:none}
+  .bTitle{font-size:1.05rem;font-weight:600;display:block}
+  .bDesc{font-size:.82rem;color:var(--muted);display:block;margin-top:1px}
+
+  .btn-primary{background:var(--ok-soft);border-color:#2f5b46}
+  .btn-primary .ic{color:var(--ok)}
+  .btn-danger{background:var(--amapola-soft);border-color:#6e2b26}
+  .btn-danger .ic{color:var(--amapola)}
+  .btn-ghost{background:transparent}
+  .btn-ghost .ic{color:var(--muted)}
+
+  .flash{
+    font-size:.9rem;color:var(--ok);margin:6px 2px 0;min-height:1.2em;
+  }
+  .flash.warn{color:var(--amapola)}
+
+  /* ----- BUSCADOR ----- */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:20px;margin:0 0 18px}
+  label{display:block;font-size:.85rem;color:var(--muted);margin:0 0 6px}
+  input{
+    width:100%;font:inherit;color:var(--ink);background:var(--panel2);
+    border:1px solid var(--line);border-radius:14px;padding:14px 16px;margin:0 0 4px;
+  }
+  input:focus{outline:none;border-color:var(--amapola)}
+  .hint{font-size:.78rem;color:var(--muted);margin:4px 2px 0}
+  .go{
+    margin-top:16px;justify-content:center;background:var(--amapola);
+    border-color:var(--amapola);color:#fff;font-weight:600;font-size:1.05rem;
+  }
+  .go .ic{color:#fff}
+
+  /* ----- LISTA DE REVISIONES ----- */
+  #revs{margin:0}
+  .rev{
+    display:flex;align-items:center;gap:14px;width:100%;margin:0 0 10px;
+  }
+  .rev .when{display:block;font-weight:600}
+  .rev .who{display:block;font-size:.8rem;color:var(--muted);margin-top:1px}
+  .revLoading{color:var(--muted);text-align:center;padding:14px}
+
+  .err{color:var(--amapola);font-size:.9rem;margin:10px 2px 0}
+  .none{color:var(--muted);text-align:center;padding:20px}
+
+  details{margin:22px 0 0;border-top:1px solid var(--line);padding-top:18px}
+  summary{color:var(--muted);cursor:pointer;font-size:.9rem}
+  details p{color:var(--muted);font-size:.86rem}
+  details b{color:var(--ink)}
+</style>
+</head>
+<body>
+
+<h1>Rescate Gist</h1>
+<p class="ver">1.0 · Amapola</p>
+
+<!-- Resultado: aparece aquí, arriba del todo -->
+<section id="resultZone" aria-live="polite">
+  <div class="rHead"><span class="dot"></span><h2 id="rTitle">Revisión cargada</h2></div>
+  <p class="rSub" id="rSub"></p>
+  <div class="btnRow">
+    <button class="btn-primary" id="copyClean">
+      <span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="9"/></svg></span>
+      <span><span class="bTitle">Copiar SIN claves</span><span class="bDesc">Seguro para pegar en el chat. Sin tokens ni contraseñas.</span></span>
+    </button>
+    <button class="btn-primary" id="downClean">
+      <span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 4 5-4"/><path d="M5 21h14"/></svg></span>
+      <span><span class="bTitle">Descargar SIN claves</span><span class="bDesc">Guarda el .json limpio en el iPad.</span></span>
+    </button>
+    <button class="btn-danger" id="copyKeys">
+      <span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2l-2 2"/><circle cx="8" cy="15" r="5"/><path d="M11.5 11.5L20 3"/><path d="M17 6l2 2"/></svg></span>
+      <span><span class="bTitle">Copiar solo tus tokens (con ♥)</span><span class="bDesc">Cada token entre corazones. NUNCA lo pegues en un chat.</span></span>
+    </button>
+    <button class="btn-danger" id="downFull">
+      <span class="ic"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 11l5 4 5-4"/><path d="M5 21h14"/><path d="M18 4l2 2"/></svg></span>
+      <span><span class="bTitle">Descargar COMPLETO</span><span class="bDesc">Con claves. Solo para tu copia privada.</span></span>
+    </button>
+  </div>
+  <p class="flash" id="flash"></p>
+</section>
+
+<!-- Buscador -->
+<div class="card">
+  <label for="gid">ID del Gist</label>
+  <input id="gid" inputmode="latin" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="fba4d91b0f588939f010a240a4c9c88d">
+  <p class="hint">Es el código largo del final de la URL de tu Gist.</p>
+
+  <label for="tok" style="margin-top:16px">Token de GitHub — opcional</label>
+  <input id="tok" type="password" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Déjalo vacío si tu Gist es público">
+  <p class="hint">Tu Gist es público de lectura: normalmente no hace falta. Solo si GitHub te limita las peticiones.</p>
+
+  <button class="go" id="load">
+    <span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg></span>
+    Ver revisiones
+  </button>
+  <p class="err" id="loadErr"></p>
+</div>
+
+<!-- Revisiones -->
+<div id="revs"></div>
+
+<details>
+  <summary>¿Cómo funciona?</summary>
+  <p>
+    Esta herramienta solo <b>lee</b>. Pide a GitHub el historial de tu Gist y te deja
+    descargar cualquier versión antigua de <b>clarito-data.json</b>.
+  </p>
+  <p>
+    El botón verde <b>Copiar SIN claves</b> borra antes tus tokens y contraseñas, así que
+    es lo único que deberías pegar en un chat. El botón rojo con corazones es solo para ti:
+    cada token va envuelto en <b>♥ diez veces a cada lado</b> para que lo localices de un vistazo.
+  </p>
+</details>
+
+<script>
+"use strict";
+
+// Claves que NUNCA salen en el modo "sin claves".
+const SENSITIVE = ["apiKey","ocrKey","visionKey","groqKey","gistToken",
+  "cloudinarySecret","cloudinaryApiKey","cloudinaryWorkerToken","devMode"];
+
+// Etiqueta legible: qué es cada token y dónde se pega en Clarito.
+const LABELS = {
+  gistToken:            "Token de GitHub  →  campo \"Token del Gist\"",
+  groqKey:              "Clave de Groq  →  campo \"Groq\" (chat IA)",
+  visionKey:            "Clave de Google Vision  →  campo \"Vision\" (OCR)",
+  cloudinaryApiKey:     "API key de Cloudinary  →  ajustes de Cloudinary",
+  cloudinarySecret:     "Secret de Cloudinary  →  ajustes de Cloudinary",
+  cloudinaryWorkerToken:"Token del Worker  →  campo \"Token del Worker\"",
+  apiKey:               "apiKey (genérica)",
+  ocrKey:               "ocrKey (OCR básico)",
+  devMode:              "devMode (interno, no es un token)"
+};
+
+const HEARTS = "\u2665\uFE0F".repeat(10); // ♥️ x10
+
+let currentRaw = null; // texto JSON de la revisión elegida
+
+const $ = s => document.querySelector(s);
+const flash = (msg, warn) => {
+  const f = $("#flash");
+  f.textContent = msg;
+  f.className = "flash" + (warn ? " warn" : "");
+  clearTimeout(flash._t);
+  flash._t = setTimeout(() => { f.textContent = ""; }, 4000);
+};
+
+function stripKeys(obj){
+  if(Array.isArray(obj)) return obj.map(stripKeys);
+  if(obj && typeof obj === "object"){
+    const out = {};
+    for(const k of Object.keys(obj)){
+      if(SENSITIVE.includes(k)) continue;
+      out[k] = stripKeys(obj[k]);
+    }
+    return out;
+  }
+  return obj;
+}
+
+function cleanJSON(){
+  const data = JSON.parse(currentRaw);
+  return JSON.stringify(stripKeys(data), null, 2);
+}
+
+// Lista de tokens encontrados, cada valor entre corazones, con su destino.
+function keysWithHearts(){
+  const data = JSON.parse(currentRaw);
+  const lines = [];
+  for(const k of SENSITIVE){
+    if(!(k in data)) continue;
+    const v = data[k];
+    if(v === "" || v === null || v === undefined) continue;
+    if(k === "devMode") continue; // no es un token
+    const label = LABELS[k] || k;
+    lines.push(label + "\n[" + HEARTS + " " + v + " " + HEARTS + "]");
+  }
+  if(!lines.length) return "Esta revisión no contiene tokens guardados.";
+  return "TUS TOKENS — no pegues esto en ningún chat\n\n" + lines.join("\n\n");
+}
+
+async function copy(text){
+  try{
+    await navigator.clipboard.writeText(text);
+    return true;
+  }catch(e){
+    // Fallback para Safari/iOS antiguos
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.position="fixed"; ta.style.opacity="0";
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    let ok=false; try{ ok=document.execCommand("copy"); }catch(_){}
+    document.body.removeChild(ta);
+    return ok;
+  }
+}
+
+function download(text, name){
+  const blob = new Blob([text], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1500);
+}
+
+// ---- Botones de resultado ----
+$("#copyClean").onclick = async () => {
+  const ok = await copy(cleanJSON());
+  flash(ok ? "Copiado sin claves. Ya puedes pegarlo." : "No se pudo copiar.", !ok);
+};
+$("#downClean").onclick = () => {
+  download(cleanJSON(), "clarito-data-SIN-claves.json");
+  flash("Descargado sin claves.");
+};
+$("#copyKeys").onclick = async () => {
+  const ok = await copy(keysWithHearts());
+  flash(ok ? "Tokens copiados. Solo para ti." : "No se pudo copiar.", true);
+};
+$("#downFull").onclick = () => {
+  download(currentRaw, "clarito-data-COMPLETO.json");
+  flash("Descargado con claves. Guárdalo en privado.", true);
+};
+
+// ---- Carga de revisiones ----
+function authHeaders(){
+  const t = $("#tok").value.trim();
+  return t ? {Authorization:"token " + t} : {};
+}
+
+async function loadRevisions(){
+  const id = $("#gid").value.trim();
+  $("#loadErr").textContent = "";
+  $("#resultZone").classList.remove("on");
+  currentRaw = null;
+  if(!id){ $("#loadErr").textContent = "Escribe el ID del Gist."; return; }
+
+  const revs = $("#revs");
+  revs.innerHTML = '<div class="revLoading">Buscando revisiones…</div>';
+
+  try{
+    const r = await fetch("https://api.github.com/gists/"+id+"/commits?per_page=100",
+      {headers:authHeaders()});
+    if(!r.ok) throw new Error(r.status===404 ? "No encuentro ese Gist. Revisa el ID."
+      : r.status===403 ? "GitHub limitó las peticiones. Espera un rato o pon un token."
+      : "GitHub respondió "+r.status+".");
+    const commits = await r.json();
+    if(!Array.isArray(commits) || !commits.length){
+      revs.innerHTML = '<p class="none">Este Gist no tiene historial.</p>'; return;
+    }
+    renderRevs(id, commits);
+  }catch(e){
+    revs.innerHTML = "";
+    $("#loadErr").textContent = e.message || "Error al conectar con GitHub.";
+  }
+}
+
+function renderRevs(id, commits){
+  const revs = $("#revs");
+  revs.innerHTML = "";
+  commits.forEach(c => {
+    const d = new Date(c.committed_at);
+    const when = d.toLocaleString("es-ES",
+      {day:"2-digit",month:"long",year:"numeric",hour:"2-digit",minute:"2-digit"});
+    const who = (c.user && c.user.login) ? c.user.login : "—";
+    const btn = document.createElement("button");
+    btn.className = "rev btn-ghost";
+    btn.innerHTML =
+      '<span class="ic"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9 9 0 0 0-6.4 2.6L3 8"/><path d="M3 4v4h4"/><path d="M12 8v4l3 2"/></svg></span>'+
+      '<span><span class="when">'+when+'</span><span class="who">'+who+'</span></span>';
+    btn.onclick = () => openRevision(id, c.version, when);
+    revs.appendChild(btn);
+  });
+}
+
+async function openRevision(id, version, when){
+  const flashEl = $("#loadErr");
+  flashEl.textContent = "Cargando esa versión…";
+  try{
+    const r = await fetch("https://api.github.com/gists/"+id+"/"+version,
+      {headers:authHeaders()});
+    if(!r.ok) throw new Error("No pude abrir esa versión ("+r.status+").");
+    const gist = await r.json();
+    const files = gist.files || {};
+    const file = files["clarito-data.json"] ||
+      files[Object.keys(files).find(k=>k.endsWith(".json"))];
+    if(!file) throw new Error("Esa versión no tiene clarito-data.json.");
+
+    let content = file.content;
+    if(file.truncated && file.raw_url){
+      const rr = await fetch(file.raw_url, {headers:authHeaders()});
+      content = await rr.text();
+    }
+    JSON.parse(content); // valida
+    currentRaw = content;
+
+    $("#rTitle").textContent = "Revisión del " + when;
+    const kb = (content.length/1024).toFixed(0);
+    $("#rSub").textContent = "clarito-data.json · " + kb + " KB";
+    $("#resultZone").classList.add("on");
+    flashEl.textContent = "";
+    window.scrollTo({top:0, behavior:"smooth"});
+  }catch(e){
+    flashEl.textContent = e.message || "Error al abrir la revisión.";
+  }
+}
+
+$("#load").onclick = loadRevisions;
+</script>
+</body>
+</html>
