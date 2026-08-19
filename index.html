@@ -245,13 +245,21 @@ async function loadRevisions(){
   revs.innerHTML = '<div class="revLoading">Buscando revisiones…</div>';
 
   try{
-    const r = await fetch("https://api.github.com/gists/"+id+"/commits?per_page=100",
-      {headers:authHeaders()});
-    if(!r.ok) throw new Error(r.status===404 ? "No encuentro ese Gist. Revisa el ID."
-      : r.status===403 ? "GitHub limitó las peticiones. Espera un rato o pon un token."
-      : "GitHub respondió "+r.status+".");
-    const commits = await r.json();
-    if(!Array.isArray(commits) || !commits.length){
+    const commits = [];
+    for(let page = 1; page <= 30; page++){
+      const r = await fetch(
+        "https://api.github.com/gists/"+id+"/commits?per_page=100&page="+page,
+        {headers:authHeaders()});
+      if(!r.ok) throw new Error(r.status===404 ? "No encuentro ese Gist. Revisa el ID."
+        : r.status===403 ? "GitHub limitó las peticiones. Espera un rato o pon un token."
+        : "GitHub respondió "+r.status+".");
+      const batch = await r.json();
+      if(!Array.isArray(batch) || !batch.length) break;
+      commits.push(...batch);
+      revs.innerHTML = '<div class="revLoading">Buscando revisiones… '+commits.length+'</div>';
+      if(batch.length < 100) break; // última página
+    }
+    if(!commits.length){
       revs.innerHTML = '<p class="none">Este Gist no tiene historial.</p>'; return;
     }
     renderRevs(id, commits);
@@ -264,6 +272,12 @@ async function loadRevisions(){
 function renderRevs(id, commits){
   const revs = $("#revs");
   revs.innerHTML = "";
+  if(commits.length >= 3000){
+    const w = document.createElement("p");
+    w.className = "err";
+    w.textContent = "Aviso: hay muchísimas revisiones; puede que falten las más antiguas.";
+    revs.appendChild(w);
+  }
   commits.forEach(c => {
     const d = new Date(c.committed_at);
     const when = d.toLocaleString("es-ES",
